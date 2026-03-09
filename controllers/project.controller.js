@@ -1,5 +1,5 @@
 import Project from '../models/Project.js'
-import { cloudinary } from '../middleware/upload.middleware.js'
+import { cloudinary, uploadToCloudinary } from '../middleware/upload.middleware.js'
 
 // GET /api/projects — public
 export const getProjects = async (req, res) => {
@@ -39,10 +39,14 @@ export const createProject = async (req, res) => {
   try {
     const { title, description, longDescription, category, techStack, liveUrl, githubUrl, featured, order } = req.body
 
-    const images = req.files?.map(file => ({
-      url: file.path,
-      publicId: file.filename,
-    })) || []
+    // NEW
+    const imageUploads = await Promise.all(
+      (req.files || []).map(file => uploadToCloudinary(file.buffer))
+    )
+    const images = imageUploads.map(result => ({
+      url: result.secure_url,
+      publicId: result.public_id,
+    }))
 
     const project = await Project.create({
       title,
@@ -84,7 +88,8 @@ export const updateProject = async (req, res) => {
 
     // Add new images
     if (req.files?.length) {
-      const newImages = req.files.map(file => ({ url: file.path, publicId: file.filename }))
+      const uploaded = await Promise.all(req.files.map(f => uploadToCloudinary(f.buffer)))
+      const newImages = uploaded.map(r => ({ url: r.secure_url, publicId: r.public_id }))
       project.images.push(...newImages)
     }
 
