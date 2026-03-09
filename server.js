@@ -6,10 +6,27 @@ import authRoutes    from './routes/auth.routes.js'
 import projectRoutes from './routes/project.routes.js'
 import contactRoutes from './routes/contact.routes.js'
 import statsRoutes   from './routes/stats.routes.js'
+import rateLimit from 'express-rate-limit'
 
 connectDB()
 
 const app = express()
+
+// Global rate limit — all routes
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // max 100 requests per IP
+  message: { message: 'Too many requests, please try again later.' }
+})
+
+// Strict limit for login — brute force protection
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // only 5 login attempts per IP
+  message: { message: 'Too many login attempts, please try again in 15 minutes.' }
+})
+
+app.use(globalLimiter)
 
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
@@ -19,7 +36,8 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 
 // Routes
-app.use('/api/auth',     authRoutes)
+app.use('/api/auth/login', loginLimiter)
+app.use('/api/auth', authRoutes)
 app.use('/api/projects', projectRoutes)
 app.use('/api/contact',  contactRoutes)
 app.use('/api/stats',    statsRoutes)
